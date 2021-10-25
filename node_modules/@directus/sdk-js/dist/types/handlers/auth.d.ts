@@ -1,0 +1,55 @@
+import { AxiosInstance } from 'axios';
+import { AuthStorage } from '../types';
+export declare type LoginCredentials = {
+    email: string;
+    password: string;
+    otp?: string;
+};
+export declare type AuthOptions = {
+    mode: 'cookie' | 'json';
+    autoRefresh: boolean;
+    storage: AuthStorage;
+};
+export declare type AuthResponse = {
+    access_token: string;
+    expires: number;
+    refresh_token?: string;
+};
+export declare class AuthHandler {
+    private axios;
+    private storage;
+    private mode;
+    private autoRefresh;
+    private autoRefreshTimeout;
+    private expiresAt?;
+    /**
+     * Used for tracking if accessToken is restored from store to config.
+     * Axios uses this number for interceptor. If it's number it means it's inited.
+     */
+    private accessTokenInitId;
+    constructor(axios: AxiosInstance, options: AuthOptions);
+    get token(): string | null;
+    set token(val: string | null);
+    login(credentials: LoginCredentials): Promise<{
+        data: AuthResponse;
+    }>;
+    /**
+     * Refresh access token 10 seconds before expiration
+     */
+    refresh(isInitialInvoke: Boolean): Promise<{
+        data: AuthResponse;
+    } | undefined>;
+    logout(): Promise<void>;
+    password: {
+        request: (email: string) => Promise<void>;
+        reset: (token: string, password: string) => Promise<void>;
+    };
+    /**
+     * There is no prettier way to do this. We need to set access token before first request.
+     * This way we intercept axios request and only first time request token from store,
+     * and allows us to do new Directus(url).items(col).read() without having to handle
+     * access_token restoration in methods
+     */
+    private initializeAccessToken;
+    private removeTimeout;
+}

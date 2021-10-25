@@ -1,0 +1,472 @@
+'use strict';
+
+var axios = require('axios');
+
+function _interopDefaultLegacy (e) { return e && typeof e === 'object' && 'default' in e ? e : { 'default': e }; }
+
+var axios__default = /*#__PURE__*/_interopDefaultLegacy(axios);
+
+class ItemsHandler {
+    constructor(collection, axios) {
+        this.axios = axios;
+        this.endpoint = collection.startsWith('directus_') ? `/${collection.substring(9)}/` : `/items/${collection}/`;
+    }
+    async create(payloads, query) {
+        const result = await this.axios.post(this.endpoint, payloads, {
+            params: query,
+        });
+        return result.data;
+    }
+    async read(keysOrQuery, query) {
+        let keys = null;
+        if (keysOrQuery &&
+            (Array.isArray(keysOrQuery) || typeof keysOrQuery === 'string' || typeof keysOrQuery === 'number')) {
+            keys = keysOrQuery;
+        }
+        let params = {};
+        if (query) {
+            params = query;
+        }
+        else if (!query && typeof keysOrQuery === 'object' && Array.isArray(keysOrQuery) === false) {
+            params = keysOrQuery;
+        }
+        let endpoint = this.endpoint;
+        if (keys) {
+            endpoint += keys;
+        }
+        const result = await this.axios.get(endpoint, { params });
+        return result.data;
+    }
+    async update(keyOrPayload, payloadOrQuery, query) {
+        if (typeof keyOrPayload === 'string' ||
+            typeof keyOrPayload === 'number' ||
+            (Array.isArray(keyOrPayload) && keyOrPayload.every((key) => ['string', 'number'].includes(typeof key)))) {
+            const key = keyOrPayload;
+            const payload = payloadOrQuery;
+            const result = await this.axios.patch(`${this.endpoint}${key}`, payload, {
+                params: query,
+            });
+            return result.data;
+        }
+        else {
+            const result = await this.axios.patch(`${this.endpoint}`, keyOrPayload, {
+                params: payloadOrQuery,
+            });
+            return result.data;
+        }
+    }
+    async delete(keys) {
+        await this.axios.delete(`${this.endpoint}${keys}`);
+    }
+}
+
+class ServerHandler {
+    constructor(axios) {
+        this.specs = {
+            oas: async () => {
+                const result = await this.axios.get('/server/specs/oas');
+                return result.data;
+            },
+        };
+        this.axios = axios;
+    }
+    async ping() {
+        await this.axios.get('/server/ping');
+        return 'pong';
+    }
+    async info() {
+        const result = await this.axios.get('/server/info');
+        return result.data;
+    }
+}
+
+class UtilsHandler {
+    constructor(axios) {
+        this.random = {
+            string: async (length = 32) => {
+                const result = await this.axios.get('/utils/random/string', { params: { length } });
+                return result.data;
+            },
+        };
+        this.hash = {
+            generate: async (string) => {
+                const result = await this.axios.post('/utils/hash/generate', { string });
+                return result.data;
+            },
+            verify: async (string, hash) => {
+                const result = await this.axios.post('/utils/hash/verify', { string, hash });
+                return result.data;
+            },
+        };
+        this.axios = axios;
+    }
+    async sort(collection, item, to) {
+        await this.axios.post(`/utils/sort/${collection}`, { item, to });
+    }
+    async revert(revision) {
+        await this.axios.post(`/utils/revert/${revision}`);
+    }
+}
+
+class ActivityHandler {
+    constructor(axios) {
+        this.comments = {
+            create: async (payload) => {
+                const response = await this.axios.post('/activity/comments', payload);
+                return response.data;
+            },
+            update: async (key, payload) => {
+                const response = await this.axios.patch(`/activity/comments/${key}`, payload);
+                return response.data;
+            },
+            delete: async (key) => {
+                await this.axios.delete(`/activity/comments/${key}`);
+            },
+        };
+        this.axios = axios;
+        this.itemsHandler = new ItemsHandler('directus_activity', axios);
+    }
+    async read(keysOrQuery, query) {
+        const result = await this.itemsHandler.read(keysOrQuery, query);
+        return result;
+    }
+}
+
+class FoldersHandler extends ItemsHandler {
+    constructor(axios) {
+        super('directus_folders', axios);
+    }
+}
+
+class PermissionsHandler extends ItemsHandler {
+    constructor(axios) {
+        super('directus_permissions', axios);
+    }
+}
+
+class PresetsHandler extends ItemsHandler {
+    constructor(axios) {
+        super('directus_presets', axios);
+    }
+}
+
+class RelationsHandler extends ItemsHandler {
+    constructor(axios) {
+        super('directus_relations', axios);
+    }
+}
+
+class RevisionsHandler extends ItemsHandler {
+    constructor(axios) {
+        super('directus_revisions', axios);
+    }
+}
+
+class RolesHandler extends ItemsHandler {
+    constructor(axios) {
+        super('directus_roles', axios);
+    }
+}
+
+class UsersHandler extends ItemsHandler {
+    constructor(axios) {
+        super('directus_users', axios);
+        this.tfa = {
+            enable: async (password) => {
+                await this.axios.post('/users/tfa/enable', { password });
+            },
+            disable: async (otp) => {
+                await this.axios.post('/users/tfa/disable', { otp });
+            },
+        };
+        this.me = {
+            read: async (query) => {
+                const response = await this.axios.get('/users/me', { params: query });
+                return response.data;
+            },
+            update: async (payload, query) => {
+                const response = await this.axios.patch('/users/me', payload, { params: query });
+                return response.data;
+            },
+        };
+    }
+    async invite(email, role) {
+        await this.axios.post('/users/invite', { email, role });
+    }
+    async acceptInvite(token, password) {
+        await this.axios.post('/users/invite/accept', { token, password });
+    }
+}
+
+class SettingsHandler extends ItemsHandler {
+    constructor(axios) {
+        super('directus_settings', axios);
+    }
+}
+
+class FilesHandler extends ItemsHandler {
+    constructor(axios) {
+        super('directus_files', axios);
+    }
+}
+
+class CollectionsHandler extends ItemsHandler {
+    constructor(axios) {
+        super('directus_collections', axios);
+    }
+}
+
+class FieldsHandler extends ItemsHandler {
+    constructor(axios) {
+        super('directus_fields', axios);
+    }
+}
+
+class AuthHandler {
+    constructor(axios, options) {
+        this.autoRefreshTimeout = null;
+        /**
+         * Used for tracking if accessToken is restored from store to config.
+         * Axios uses this number for interceptor. If it's number it means it's inited.
+         */
+        this.accessTokenInitId = null;
+        this.password = {
+            request: async (email) => {
+                await this.axios.post('/auth/password/request', { email });
+            },
+            reset: async (token, password) => {
+                await this.axios.post('/auth/password/reset', { token, password });
+            },
+        };
+        this.axios = axios;
+        this.storage = options.storage;
+        this.mode = options.mode;
+        this.autoRefresh = options.autoRefresh;
+        this.accessTokenInitId = this.axios.interceptors.request.use((config) => this.initializeAccessToken(config));
+        if (this.autoRefresh) {
+            this.refresh(true);
+        }
+    }
+    get token() {
+        var _a, _b;
+        return ((_b = (_a = this.axios.defaults.headers) === null || _a === void 0 ? void 0 : _a.Authorization) === null || _b === void 0 ? void 0 : _b.split(' ')[1]) || null;
+    }
+    set token(val) {
+        var _a;
+        if (val === null) {
+            (_a = this.axios.defaults.headers) === null || _a === void 0 ? true : delete _a.Authorization;
+        }
+        else {
+            this.axios.defaults.headers = {
+                ...(this.axios.defaults.headers || {}),
+                Authorization: `Bearer ${val}`,
+            };
+        }
+    }
+    async login(credentials) {
+        this.removeTimeout();
+        const response = await this.axios.post('/auth/login', { ...credentials, mode: this.mode });
+        const data = response.data.data;
+        this.token = data.access_token;
+        this.expiresAt = Date.now() + data.expires;
+        await this.storage.setItem('directus_access_token', this.token);
+        await this.storage.setItem('directus_access_token_expires', this.expiresAt);
+        if (this.mode === 'json') {
+            await this.storage.setItem('directus_refresh_token', data.refresh_token);
+        }
+        if (this.autoRefresh) {
+            this.refresh(true);
+        }
+        return response.data;
+    }
+    /**
+     * Refresh access token 10 seconds before expiration
+     */
+    async refresh(isInitialInvoke) {
+        this.removeTimeout();
+        this.expiresAt = await this.storage.getItem('directus_access_token_expires');
+        if (!this.expiresAt)
+            return;
+        if (Date.now() + 10000 < this.expiresAt && this.autoRefresh) {
+            this.autoRefreshTimeout = setTimeout(() => this.refresh(false), this.expiresAt - Date.now() - 10000);
+            if (!isInitialInvoke) {
+                return;
+            }
+        }
+        const payload = { mode: this.mode };
+        if (this.mode === 'json') {
+            const refreshToken = await this.storage.getItem('directus_refresh_token');
+            payload['refresh_token'] = refreshToken;
+        }
+        if (this.expiresAt < Date.now() + 1000) {
+            this.token = null;
+        }
+        const response = await this.axios
+            .post('/auth/refresh', payload)
+            .catch(async (error) => {
+            var _a;
+            const status = (_a = error.response) === null || _a === void 0 ? void 0 : _a.status;
+            if (status === 401) {
+                await this.storage.removeItem('directus_access_token');
+                await this.storage.removeItem('directus_access_token_expires');
+                if (this.mode === 'json') {
+                    await this.storage.removeItem('directus_refresh_token');
+                }
+                this.token = null;
+            }
+            throw Promise.reject(error);
+        });
+        const data = response.data.data;
+        this.token = data.access_token;
+        this.expiresAt = Date.now() + data.expires;
+        await this.storage.setItem('directus_access_token', this.token);
+        await this.storage.setItem('directus_access_token_expires', this.expiresAt);
+        if (this.mode === 'json') {
+            await this.storage.setItem('directus_refresh_token', response.data.data.refresh_token);
+        }
+        if (this.autoRefresh) {
+            this.autoRefreshTimeout = setTimeout(() => this.refresh(false), data.expires - 10000);
+        }
+        return response.data;
+    }
+    async logout() {
+        this.removeTimeout();
+        const data = {};
+        if (this.mode === 'json') {
+            data.refresh_token = await this.storage.getItem('directus_refresh_token');
+        }
+        await this.axios.post('/auth/logout', data);
+        await this.storage.removeItem('directus_access_token');
+        await this.storage.removeItem('directus_access_token_expires');
+        if (this.mode === 'json') {
+            await this.storage.removeItem('directus_refresh_token');
+        }
+        this.token = null;
+    }
+    /**
+     * There is no prettier way to do this. We need to set access token before first request.
+     * This way we intercept axios request and only first time request token from store,
+     * and allows us to do new Directus(url).items(col).read() without having to handle
+     * access_token restoration in methods
+     */
+    async initializeAccessToken(config) {
+        if (this.accessTokenInitId !== null) {
+            const token = await this.storage.getItem('directus_access_token');
+            if (token) {
+                this.token = token;
+                config.headers.Authorization = `Bearer ${token}`;
+            }
+            this.axios.interceptors.request.eject(this.accessTokenInitId);
+            this.accessTokenInitId = null;
+        }
+        return config;
+    }
+    removeTimeout() {
+        if (this.autoRefreshTimeout !== null) {
+            clearTimeout(this.autoRefreshTimeout);
+            this.autoRefreshTimeout = null;
+        }
+    }
+}
+
+class BrowserStore {
+    async getItem(key) {
+        return window.localStorage.getItem(key);
+    }
+    async setItem(key, value) {
+        window.localStorage.setItem(key, value);
+    }
+    async removeItem(key) {
+        window.localStorage.removeItem(key);
+    }
+}
+
+class MemoryStore {
+    constructor() {
+        this.values = {};
+    }
+    async getItem(key) {
+        return this.values[key];
+    }
+    async setItem(key, value) {
+        this.values[key] = value;
+    }
+    async removeItem(key) {
+        delete this.values[key];
+    }
+}
+
+class DirectusSDK {
+    constructor(url, options) {
+        var _a, _b, _c, _d, _e, _f;
+        this.axios = axios__default['default'].create({
+            baseURL: url,
+            withCredentials: true,
+        });
+        this.authOptions = {
+            storage: (_b = (_a = options === null || options === void 0 ? void 0 : options.auth) === null || _a === void 0 ? void 0 : _a.storage) !== null && _b !== void 0 ? _b : (typeof window === 'undefined' ? new MemoryStore() : new BrowserStore()),
+            mode: (_d = (_c = options === null || options === void 0 ? void 0 : options.auth) === null || _c === void 0 ? void 0 : _c.mode) !== null && _d !== void 0 ? _d : 'cookie',
+            autoRefresh: (_f = (_e = options === null || options === void 0 ? void 0 : options.auth) === null || _e === void 0 ? void 0 : _e.autoRefresh) !== null && _f !== void 0 ? _f : false,
+        };
+        this.auth = new AuthHandler(this.axios, this.authOptions);
+    }
+    // Global helpers
+    ////////////////////////////////////////////////////////////////////////////////////////////////
+    get url() {
+        return this.axios.defaults.baseURL;
+    }
+    set url(val) {
+        this.axios.defaults.baseURL = val;
+    }
+    items(collection) {
+        if (collection.startsWith('directus_')) {
+            throw new Error(`You can't read the "${collection}" collection directly.`);
+        }
+        return new ItemsHandler(collection, this.axios);
+    }
+    get activity() {
+        return new ActivityHandler(this.axios);
+    }
+    get collections() {
+        return new CollectionsHandler(this.axios);
+    }
+    get fields() {
+        return new FieldsHandler(this.axios);
+    }
+    get files() {
+        return new FilesHandler(this.axios);
+    }
+    get folders() {
+        return new FoldersHandler(this.axios);
+    }
+    get permissions() {
+        return new PermissionsHandler(this.axios);
+    }
+    get presets() {
+        return new PresetsHandler(this.axios);
+    }
+    get relations() {
+        return new RelationsHandler(this.axios);
+    }
+    get revisions() {
+        return new RevisionsHandler(this.axios);
+    }
+    get roles() {
+        return new RolesHandler(this.axios);
+    }
+    get server() {
+        return new ServerHandler(this.axios);
+    }
+    get settings() {
+        return new SettingsHandler(this.axios);
+    }
+    get users() {
+        return new UsersHandler(this.axios);
+    }
+    get utils() {
+        return new UtilsHandler(this.axios);
+    }
+}
+
+module.exports = DirectusSDK;
+//# sourceMappingURL=sdk-js.cjs.js.map
